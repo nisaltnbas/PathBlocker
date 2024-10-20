@@ -1,11 +1,13 @@
 import java.util.ArrayList;
 import java.util.Scanner;
+import java.io.File;
 
 public class PathBlocker {
     private Map map;
     private Player player;
     private int targetX;
     private int targetY;
+    private int moveCount = 0; // Hareket sayısını takip eder
 
     public PathBlocker(Map map) {
         this.map = map;
@@ -77,7 +79,7 @@ public class PathBlocker {
                 int nextValue = map.getValues().get(nextY).get(nextX);
 
                 // Add the current position to the path
-                path.add(new int[]{currentX, currentY});
+                path.add(new int[] { currentX, currentY });
 
                 // Move to the next position
                 currentX = nextX;
@@ -96,7 +98,8 @@ public class PathBlocker {
                 continue;
             }
 
-            // Turn all cells in the path into walls, except for the last one (the player's new position)
+            // Turn all cells in the path into walls, except for the last one (the player's
+            // new position)
             for (int i = 0; i < path.size(); i++) {
                 int[] pos = path.get(i);
                 int x = pos[0];
@@ -107,12 +110,22 @@ public class PathBlocker {
                     continue;
                 }
 
-                // Set the cell to a wall
+                // Set the cell to a wallD
                 setCell(x, y, 1);
             }
 
             // Move the player to the new position
             movePlayer(currentX, currentY);
+
+            // Her hareketten sonra PNG dosyasını kaydet
+            moveCount++; // Hareket sayısını artır
+            String fileName = String.format("level01/%04d.png", moveCount);
+
+            // Dosya kaydetmeden önce klasör oluştur
+            ensureDirectoryExists("level01");
+
+            map.saveAsPng(fileName); // PNG olarak kaydet
+            System.out.println(fileName + " has been saved.");
 
             // Check if the player has reached the target
             if (currentX == targetX && currentY == targetY) {
@@ -132,7 +145,7 @@ public class PathBlocker {
 
     // Check if there are any valid moves left for the player
     private boolean hasValidMoves() {
-        int[][] directions = {{-1,0}, {1,0}, {0,-1}, {0,1}};
+        int[][] directions = { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };
         for (int[] dir : directions) {
             int x = player.getX();
             int y = player.getY();
@@ -193,7 +206,15 @@ public class PathBlocker {
         }
     }
 
-    // Main method remains in PathBlocker
+    // Ensure that the directory exists, if not, create it
+    private void ensureDirectoryExists(String dirPath) {
+
+        File directory = new File(dirPath);
+        if (!directory.exists()) {
+            directory.mkdirs();
+        }
+    }
+
     public static void main(String[] args) {
         String[] filePaths = {
                 "level1.txt", "level2.txt", "level3.txt", "level4.txt", "level5.txt",
@@ -206,10 +227,5 @@ public class PathBlocker {
         Map map = maps.get(0); // Change the index to select a different level
         PathBlocker game = new PathBlocker(map);
         game.play();
-
-        // Optional: Save the final map as an image
-        String fileName = "final_map.png";
-        map.saveAsPng(fileName);
-        System.out.println("Final map saved as " + fileName);
     }
 }
