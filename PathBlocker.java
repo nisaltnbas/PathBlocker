@@ -8,16 +8,18 @@ public class PathBlocker {
     private int targetX;
     private int targetY;
     private int moveCount = 0; // Hareket sayısını takip eder
+    private String levelFolder; // Level klasörü adı
 
-    public PathBlocker(Map map) {
+    public PathBlocker(Map map, String levelFolder) {
         this.map = map;
+        this.levelFolder = levelFolder;
         initializeGame();
+        ensureDirectoryExists(levelFolder); // Klasörün var olup olmadığını kontrol eder
     }
 
-    // Initialize the game by finding the player's and target's positions
+    // Oyunu başlatırken oyuncu ve hedef pozisyonunu bulur
     private void initializeGame() {
         ArrayList<ArrayList<Integer>> values = map.getValues();
-
         for (int y = 0; y < values.size(); y++) {
             for (int x = 0; x < values.get(y).size(); x++) {
                 int value = values.get(y).get(x);
@@ -31,19 +33,21 @@ public class PathBlocker {
         }
     }
 
-    // Main game loop
+    // Oyun oynanışı
     public void play() {
         Scanner scanner = new Scanner(System.in);
         boolean gameWon = false;
+
+        // İlk olarak haritanın başlangıç halini kaydet
+        saveCurrentMapState();
 
         while (!gameWon) {
             displayMap();
             System.out.print("Move (W/A/S/D): ");
             String input = scanner.nextLine().trim().toUpperCase();
 
-            int dirX = 0;
-            int dirY = 0;
-
+            // Hareket yönlerini belirle
+            int dirX = 0, dirY = 0;
             switch (input) {
                 case "W":
                     dirY = -1;
@@ -58,11 +62,11 @@ public class PathBlocker {
                     dirX = 1;
                     break;
                 default:
-                    System.out.println("Invalid input! Use W/A/S/D to move.");
+                    System.out.println("Geçersiz giriş! W/A/S/D kullanın.");
                     continue;
             }
 
-            // Remember the path the player will pass through
+            // Oyuncunun hareket ettiği yol
             ArrayList<int[]> path = new ArrayList<>();
             int currentX = player.getX();
             int currentY = player.getY();
@@ -72,78 +76,64 @@ public class PathBlocker {
                 int nextX = currentX + dirX;
                 int nextY = currentY + dirY;
 
-                if (!isValidMove(nextX, nextY)) {
-                    break; // Can't move further
-                }
+                if (!isValidMove(nextX, nextY))
+                    break;
 
                 int nextValue = map.getValues().get(nextY).get(nextX);
 
-                // Add the current position to the path
                 path.add(new int[] { currentX, currentY });
-
-                // Move to the next position
                 currentX = nextX;
                 currentY = nextY;
                 canMove = true;
 
-                // If we've reached the target, we need to stop moving
-                if (nextValue == 2) {
-                    break;
-                }
+                if (nextValue == 2)
+                    break; // Hedefe ulaştıysa dur
             }
 
-            // If the player didn't move
             if (!canMove) {
-                System.out.println("You can't move in that direction!");
+                System.out.println("Bu yöne hareket edemezsiniz!");
                 continue;
             }
 
-            // Turn all cells in the path into walls, except for the last one (the player's
-            // new position)
+            // Yol boyunca duvarları yerleştir (hedef hariç)
             for (int i = 0; i < path.size(); i++) {
                 int[] pos = path.get(i);
                 int x = pos[0];
                 int y = pos[1];
-
-                // If the cell is the target, we don't turn it into a wall
-                if (x == targetX && y == targetY) {
-                    continue;
-                }
-
-                // Set the cell to a wallD
-                setCell(x, y, 1);
+                if (x == targetX && y == targetY)
+                    continue; // Hedefi duvar yapma
+                setCell(x, y, 1); // Duvar yap
             }
 
-            // Move the player to the new position
+            // Oyuncuyu yeni pozisyona taşı
             movePlayer(currentX, currentY);
 
-            // Her hareketten sonra PNG dosyasını kaydet
-            moveCount++; // Hareket sayısını artır
-            String fileName = String.format("level01/%04d.png", moveCount);
+            // Hareketten sonra haritayı PNG olarak kaydet
+            saveCurrentMapState();
 
-            // Dosya kaydetmeden önce klasör oluştur
-            ensureDirectoryExists("level01");
-
-            map.saveAsPng(fileName); // PNG olarak kaydet
-            System.out.println(fileName + " has been saved.");
-
-            // Check if the player has reached the target
+            // Oyunun bitip bitmediğini kontrol et
             if (currentX == targetX && currentY == targetY) {
                 gameWon = true;
                 displayMap();
-                System.out.println("Congratulations! You've reached the target!");
+                System.out.println("Tebrikler! Hedefe ulaştınız!");
             } else if (!hasValidMoves()) {
-                // Check if the player has any valid moves left
                 displayMap();
-                System.out.println("No more valid moves! Game over.");
+                System.out.println("Hareket edebileceğiniz geçerli bir yol kalmadı! Oyun bitti.");
                 break;
             }
         }
 
-        scanner.close();
     }
 
-    // Check if there are any valid moves left for the player
+    // Geçerli harita durumunu PNG olarak kaydet
+    private void saveCurrentMapState() {
+        moveCount++;
+        String fileName = String.format("%s/%04d.png", levelFolder, moveCount);
+        map.saveAsPng(fileName);
+        System.out.println(fileName + " kaydedildi.");
+    }
+
+    // Oyuncunun geçerli bir hareket yapıp yapamayacağını kontrol eder
     private boolean hasValidMoves() {
         int[][] directions = { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };
         for (int[] dir : directions) {
@@ -156,15 +146,12 @@ public class PathBlocker {
                 int nextX = x + dirX;
                 int nextY = y + dirY;
 
-                if (!isValidMove(nextX, nextY)) {
+                if (!isValidMove(nextX, nextY))
                     break;
-                }
 
                 int value = map.getValues().get(nextY).get(nextX);
-
-                if (value != 1) {
+                if (value != 1)
                     return true;
-                }
 
                 x = nextX;
                 y = nextY;
@@ -173,29 +160,27 @@ public class PathBlocker {
         return false;
     }
 
-    // Set a cell's value on the map
-    private void setCell(int x, int y, int value) {
-        map.getValues().get(y).set(x, value);
-    }
-
-    // Check if the move is valid (not moving into a wall)
+    // Geçerli bir hareket olup olmadığını kontrol eder
     private boolean isValidMove(int x, int y) {
         ArrayList<ArrayList<Integer>> values = map.getValues();
         if (y < 0 || y >= values.size() || x < 0 || x >= values.get(y).size()) {
             return false;
         }
-        int value = values.get(y).get(x);
-        return value != 1; // Can't move into walls
+        return values.get(y).get(x) != 1; // Duvara çarpmaz
     }
 
-    // Update the player's position on the map
+    // Bir hücrenin değerini günceller
+    private void setCell(int x, int y, int value) {
+        map.getValues().get(y).set(x, value);
+    }
+
+    // Oyuncuyu yeni pozisyona taşır
     private void movePlayer(int x, int y) {
-        // Set the new position to the player (3)
         setCell(x, y, 3);
         player.setPosition(x, y);
     }
 
-    // Display the current state of the map using numbers
+    // Haritayı ekrana yazdırır
     private void displayMap() {
         ArrayList<ArrayList<Integer>> values = map.getValues();
         for (ArrayList<Integer> row : values) {
@@ -206,9 +191,8 @@ public class PathBlocker {
         }
     }
 
-    // Ensure that the directory exists, if not, create it
+    // Klasörün var olup olmadığını kontrol eder, yoksa oluşturur
     private void ensureDirectoryExists(String dirPath) {
-
         File directory = new File(dirPath);
         if (!directory.exists()) {
             directory.mkdirs();
@@ -223,9 +207,11 @@ public class PathBlocker {
 
         ArrayList<Map> maps = Map.readMaps(filePaths);
 
-        // Start the game with the first map
-        Map map = maps.get(0); // Change the index to select a different level
-        PathBlocker game = new PathBlocker(map);
-        game.play();
+        for (int i = 0; i < maps.size(); i++) {
+            String levelFolder = String.format("level%02d", i + 1);
+            Map map = maps.get(i);
+            PathBlocker game = new PathBlocker(map, levelFolder);
+            game.play();
+        }
     }
 }
