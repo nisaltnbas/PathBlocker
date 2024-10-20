@@ -191,7 +191,7 @@ public class PathBlocker {
         }
     }
 
-    // Klasörün var olup olmadığını kontrol eder, yoksa oluşturur
+    // Klasörün yoksa klasör oluşturur
     private void ensureDirectoryExists(String dirPath) {
         File directory = new File(dirPath);
         if (!directory.exists()) {
