@@ -8,10 +8,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import javax.imageio.ImageIO;
 
-public class Map {
+public class ChartMap {
     private ArrayList<ArrayList<Integer>> values;
 
-    public Map(ArrayList<ArrayList<Integer>> values) {
+    public ChartMap(ArrayList<ArrayList<Integer>> values) {
         this.values = values;
     }
 
@@ -19,8 +19,8 @@ public class Map {
         return values;
     }
 
-    public static ArrayList<Map> readMaps(String[] filePaths) {
-        ArrayList<Map> maps = new ArrayList<>();
+    public static ArrayList<ChartMap> readMaps(String[] filePaths) {
+        ArrayList<ChartMap> maps = new ArrayList<>();
 
         for (String filePath : filePaths) {
             ArrayList<ArrayList<Integer>> values = new ArrayList<>();
@@ -37,7 +37,7 @@ public class Map {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            maps.add(new Map(values));
+            maps.add(new ChartMap(values));
         }
 
         return maps;
