@@ -48,11 +48,11 @@ public class ChartMap {
         int width = values.get(0).size();
         int height = values.size();
         int blockSize = 50; // Increase block size to create larger images
-        int borderThickness = blockSize;
+        
 
         BufferedImage image = new BufferedImage(
-                (width * blockSize) + 2 * borderThickness, 
-                (height * blockSize) + 2 * borderThickness,
+                (width * blockSize) + 2 * blockSize, 
+                (height * blockSize) + 2 * blockSize,
                 BufferedImage.TYPE_INT_RGB);
         Graphics g = image.getGraphics();
 
@@ -87,7 +87,8 @@ public class ChartMap {
                 }
 
                 g.setColor(color);
-                g.fillRect(x * blockSize + borderThickness, y * blockSize + borderThickness, blockSize, blockSize);
+                // +1 values give us the blocks around the map
+                g.fillRect( (x+1) * blockSize, (y+1) * blockSize , blockSize, blockSize);
             }
         }
         g.dispose();

@@ -36,21 +36,21 @@ class PathBlocker {
     }
 
     public void play() {
-        Queue<State> queue = new LinkedList<>();
+        Queue<GameState> queue = new LinkedList<>();
         Set<String> visited = new HashSet<>();
 
         // Initialize the initial state
         ArrayList<String> initialMoves = new ArrayList<>();
         ArrayList<ArrayList<Integer>> initialMapValues = deepCopyValues(map.getValues());
-        State initialState = new GameState(player.getX(), player.getY(), initialMapValues, initialMoves);
+        GameState initialState = new GameState(player.getX(), player.getY(), initialMapValues, initialMoves);
         queue.add(initialState);
         visited.add(initialState.getUniqueIdentifier());
 
         boolean solutionFound = false;
-        State finalState = null;
+        GameState finalState = null;
 
         while (!queue.isEmpty()) {
-            State currentState = queue.poll();
+            GameState currentState = queue.poll();
 
             if (currentState.getPlayerX() == targetX && currentState.getPlayerY() == targetY) {
                 solutionFound = true;
@@ -68,7 +68,7 @@ class PathBlocker {
                 int dirY = dirVectors[i][1];
 
                 // Simulate the move
-                State nextState = simulateMove(currentState, dirX, dirY, move);
+                GameState nextState = simulateMove(currentState, dirX, dirY, move);
 
                 if (nextState != null && !visited.contains(nextState.getUniqueIdentifier())) {
                     queue.add(nextState);
@@ -86,7 +86,7 @@ class PathBlocker {
         }
     }
 
-    private State simulateMove(State currentState, int dirX, int dirY, String move) {
+    private GameState simulateMove(GameState currentState, int dirX, int dirY, String move) {
         int currentX = currentState.getPlayerX();
         int currentY = currentState.getPlayerY();
         ArrayList<ArrayList<Integer>> values = deepCopyValues(currentState.getMapValues());
@@ -127,7 +127,7 @@ class PathBlocker {
         ArrayList<String> newMoves = new ArrayList<>(currentState.getMoves());
         newMoves.add(move);
 
-        State nextState = new GameState(currentX, currentY, values, newMoves);
+        GameState nextState = new GameState(currentX, currentY, values, newMoves);
         return nextState;
     }
 
@@ -255,24 +255,12 @@ class PathBlocker {
 
     // Abstract State class
     abstract class State {
-        protected int playerX;
-        protected int playerY;
         protected ArrayList<ArrayList<Integer>> mapValues;
         protected ArrayList<String> moves;
 
-        public State(int playerX, int playerY, ArrayList<ArrayList<Integer>> mapValues, ArrayList<String> moves) {
-            this.playerX = playerX;
-            this.playerY = playerY;
+        public State(ArrayList<ArrayList<Integer>> mapValues, ArrayList<String> moves) {
             this.mapValues = mapValues;
             this.moves = moves;
-        }
-
-        public int getPlayerX() {
-            return playerX;
-        }
-
-        public int getPlayerY() {
-            return playerY;
         }
 
         public ArrayList<ArrayList<Integer>> getMapValues() {
@@ -288,9 +276,21 @@ class PathBlocker {
 
     // Concrete subclass extending State
     class GameState extends State {
+        private int playerX;
+        private int playerY;
 
         public GameState(int playerX, int playerY, ArrayList<ArrayList<Integer>> mapValues, ArrayList<String> moves) {
-            super(playerX, playerY, mapValues, moves);
+            super(mapValues, moves);
+            this.playerX = playerX;
+            this.playerY = playerY;
+        }
+
+        public int getPlayerX() {
+            return playerX;
+        }
+
+        public int getPlayerY() {
+            return playerY;
         }
 
         @Override
