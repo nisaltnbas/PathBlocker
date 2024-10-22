@@ -15,7 +15,7 @@ class PathBlocker {
         this.levelFolder = levelFolder;
         initializeGame();
         ensureDirectoryExists(levelFolder);
-        // Add the initial map state to winningMaps
+        // Initialize winningMaps with the initial map state
         winningMaps.add(new ChartMap(deepCopyValues(map.getValues())));
         saveInitialMapState();
     }
@@ -36,24 +36,23 @@ class PathBlocker {
     }
 
     public void play() {
-        PriorityQueue<State> openSet = new PriorityQueue<>();
-        Map<String, Integer> closedSet = new HashMap<>();
+        Queue<State> queue = new LinkedList<>();
+        Set<String> visited = new HashSet<>();
 
         // Initialize the initial state
         ArrayList<String> initialMoves = new ArrayList<>();
         ArrayList<ArrayList<Integer>> initialMapValues = deepCopyValues(map.getValues());
-        int initialHeuristic = heuristic(player.getX(), player.getY());
-        State initialState = new State(player.getX(), player.getY(), initialMapValues, initialMoves, 0, initialHeuristic);
-        openSet.add(initialState);
-        closedSet.put(initialState.getUniqueIdentifier(), initialState.g + initialState.h);
+        State initialState = new GameState(player.getX(), player.getY(), initialMapValues, initialMoves);
+        queue.add(initialState);
+        visited.add(initialState.getUniqueIdentifier());
 
         boolean solutionFound = false;
         State finalState = null;
 
-        while (!openSet.isEmpty()) {
-            State currentState = openSet.poll();
+        while (!queue.isEmpty()) {
+            State currentState = queue.poll();
 
-            if (currentState.playerX == targetX && currentState.playerY == targetY) {
+            if (currentState.getPlayerX() == targetX && currentState.getPlayerY() == targetY) {
                 solutionFound = true;
                 finalState = currentState;
                 break;
@@ -71,39 +70,28 @@ class PathBlocker {
                 // Simulate the move
                 State nextState = simulateMove(currentState, dirX, dirY, move);
 
-                if (nextState != null) {
-                    String identifier = nextState.getUniqueIdentifier();
-                    int totalCost = nextState.g + nextState.h;
-
-                    if (!closedSet.containsKey(identifier) || closedSet.get(identifier) > totalCost) {
-                        openSet.add(nextState);
-                        closedSet.put(identifier, totalCost);
-                    }
+                if (nextState != null && !visited.contains(nextState.getUniqueIdentifier())) {
+                    queue.add(nextState);
+                    visited.add(nextState.getUniqueIdentifier());
                 }
             }
         }
 
         if (solutionFound) {
-            System.out.println("Solution found in " + finalState.moves.size() + " moves.");
+            System.out.println("Solution found in " + finalState.getMoves().size() + " moves.");
             // Replay the moves to save the maps
-            replaySolution(finalState.moves);
+            replaySolution(finalState.getMoves());
         } else {
             System.out.println("No solution found.");
         }
     }
 
-    private int heuristic(int x, int y) {
-        // Manhattan distance
-        return Math.abs(x - targetX) + Math.abs(y - targetY);
-    }
-
     private State simulateMove(State currentState, int dirX, int dirY, String move) {
-        int currentX = currentState.playerX;
-        int currentY = currentState.playerY;
-        ArrayList<ArrayList<Integer>> values = deepCopyValues(currentState.mapValues);
-        ArrayList<int[]> path = new ArrayList<>();
+        int currentX = currentState.getPlayerX();
+        int currentY = currentState.getPlayerY();
+        ArrayList<ArrayList<Integer>> values = deepCopyValues(currentState.getMapValues());
 
-        // Başlangıçta, oyuncunun mevcut konumunu duvara dönüştürüyoruz
+        // Turn the player's starting position into a wall
         values.get(currentY).set(currentX, 1);
 
         boolean canMove = false;
@@ -124,7 +112,7 @@ class PathBlocker {
             if (nextValue == 2)
                 break;
 
-            // Hareket ettiği her hücreyi duvara dönüştür
+            // Turn the traversed cell into a wall
             values.get(currentY).set(currentX, 1);
         }
 
@@ -132,36 +120,33 @@ class PathBlocker {
             return null;
         }
 
-        // Oyuncuyu yeni konuma taşı
+        // Move the player to the new position
         values.get(currentY).set(currentX, 3);
 
-        // Hareketleri güncelle
-        ArrayList<String> newMoves = new ArrayList<>(currentState.moves);
+        // Update moves
+        ArrayList<String> newMoves = new ArrayList<>(currentState.getMoves());
         newMoves.add(move);
 
-        int gCost = currentState.g + 1;
-        int hCost = heuristic(currentX, currentY);
-
-        State nextState = new State(currentX, currentY, values, newMoves, gCost, hCost);
+        State nextState = new GameState(currentX, currentY, values, newMoves);
         return nextState;
     }
-
 
     private boolean isValidMove(int x, int y, ArrayList<ArrayList<Integer>> values) {
         if (y < 0 || y >= values.size() || x < 0 || x >= values.get(y).size()) {
             return false;
         }
-        return values.get(y).get(x) != 1;
+        int cellValue = values.get(y).get(x);
+        return cellValue != 1;
     }
 
     private void replaySolution(ArrayList<String> moves) {
-        // Haritayı başlangıç durumuna sıfırla
+        // Reset the map to initial state
         map = new ChartMap(deepCopyValues(winningMaps.get(0).getValues()));
         initializeGame();
 
-        // Önceki kazanma hareketlerini temizle
+        // Clear any previous winning moves
         winningMaps.clear();
-        winningMaps.add(new ChartMap(deepCopyValues(map.getValues()))); // Başlangıç durumunu kaydet
+        winningMaps.add(new ChartMap(deepCopyValues(map.getValues()))); // Save initial state
 
         moveCount = 0;
 
@@ -185,7 +170,7 @@ class PathBlocker {
             int currentX = player.getX();
             int currentY = player.getY();
 
-            // Başlangıç konumunu duvara dönüştür
+            // Turn the player's starting position into a wall
             setCell(currentX, currentY, 1);
 
             boolean canMove = false;
@@ -206,37 +191,29 @@ class PathBlocker {
                 if (nextValue == 2)
                     break;
 
-                // Hareket ettiği her hücreyi duvara dönüştür
+                // Turn the traversed cell into a wall
                 setCell(currentX, currentY, 1);
             }
 
             if (!canMove) {
-                System.out.println("Hareket edilemiyor!");
+                System.out.println("Cannot move!");
                 break;
             }
 
-            // Oyuncuyu yeni konuma taşı
+            // Move player
             movePlayer(currentX, currentY);
 
-            // Geçerli harita durumunu kaydet
+            // Save current map state
             winningMaps.add(new ChartMap(deepCopyValues(map.getValues())));
             moveCount++;
         }
 
-        // Tüm haritaları kaydet
+        // Save all maps
         saveAllMaps();
     }
 
-    private void resetLevel() {
-        moveCount = 0;
-        map = new ChartMap(deepCopyValues(winningMaps.get(0).getValues()));
-        initializeGame();
-        winningMaps.clear();
-        winningMaps.add(new ChartMap(deepCopyValues(map.getValues())));
-    }
-
     private void saveInitialMapState() {
-        String fileName = String.format("%s/%04d.png", levelFolder, moveCount + 1);
+        String fileName = String.format("%s/%04d.png", levelFolder, moveCount);
         map.saveAsPng(fileName);
         System.out.println(fileName + " saved.");
         moveCount++;
@@ -244,7 +221,7 @@ class PathBlocker {
 
     private void saveAllMaps() {
         for (int i = 0; i < winningMaps.size(); i++) {
-            String fileName = String.format("%s/%04d.png", levelFolder, i + 1);
+            String fileName = String.format("%s/%04d.png", levelFolder, i);
             winningMaps.get(i).saveAsPng(fileName);
             System.out.println(fileName + " saved.");
         }
@@ -264,7 +241,7 @@ class PathBlocker {
     }
 
     private void movePlayer(int x, int y) {
-        // Oyuncunun önceki konumu zaten duvara dönüştürüldü, bu yüzden burada sadece yeni konumu güncelliyoruz
+        // The previous position is already turned into a wall
         setCell(x, y, 3);
         player.setPosition(x, y);
     }
@@ -276,24 +253,47 @@ class PathBlocker {
         }
     }
 
-    // State class for A* Algorithm
-    class State implements Comparable<State> {
-        int playerX;
-        int playerY;
-        ArrayList<ArrayList<Integer>> mapValues;
-        ArrayList<String> moves;
-        int g; // Cost from start to current node
-        int h; // Heuristic estimate from current node to goal
+    // Abstract State class
+    abstract class State {
+        protected int playerX;
+        protected int playerY;
+        protected ArrayList<ArrayList<Integer>> mapValues;
+        protected ArrayList<String> moves;
 
-        public State(int playerX, int playerY, ArrayList<ArrayList<Integer>> mapValues, ArrayList<String> moves, int g, int h) {
+        public State(int playerX, int playerY, ArrayList<ArrayList<Integer>> mapValues, ArrayList<String> moves) {
             this.playerX = playerX;
             this.playerY = playerY;
             this.mapValues = mapValues;
             this.moves = moves;
-            this.g = g;
-            this.h = h;
         }
 
+        public int getPlayerX() {
+            return playerX;
+        }
+
+        public int getPlayerY() {
+            return playerY;
+        }
+
+        public ArrayList<ArrayList<Integer>> getMapValues() {
+            return mapValues;
+        }
+
+        public ArrayList<String> getMoves() {
+            return moves;
+        }
+
+        public abstract String getUniqueIdentifier();
+    }
+
+    // Concrete subclass extending State
+    class GameState extends State {
+
+        public GameState(int playerX, int playerY, ArrayList<ArrayList<Integer>> mapValues, ArrayList<String> moves) {
+            super(playerX, playerY, mapValues, moves);
+        }
+
+        @Override
         public String getUniqueIdentifier() {
             // Unique identifier combining player position and blocked cells
             StringBuilder sb = new StringBuilder();
@@ -308,11 +308,6 @@ class PathBlocker {
                 }
             }
             return sb.toString();
-        }
-
-        @Override
-        public int compareTo(State other) {
-            return Integer.compare(this.g + this.h, other.g + other.h);
         }
     }
 
