@@ -2,22 +2,23 @@ import java.util.ArrayList;
 import java.util.Scanner;
 import java.io.File;
 
-public class PathBlocker {
+class PathBlocker {
     private Map map;
     private Player player;
     private int targetX;
     private int targetY;
-    private int moveCount = 0; // Hareket sayısını takip eder
-    private String levelFolder; // Level klasörü adı
+    private int moveCount = 0;
+    private String levelFolder;
+    private ArrayList<Map> winningMaps = new ArrayList<>();
 
     public PathBlocker(Map map, String levelFolder) {
         this.map = map;
         this.levelFolder = levelFolder;
         initializeGame();
-        ensureDirectoryExists(levelFolder); // Klasörün var olup olmadığını kontrol eder
+        ensureDirectoryExists(levelFolder);
+        saveInitialMapState();
     }
 
-    // Oyunu başlatırken oyuncu ve hedef pozisyonunu bulur
     private void initializeGame() {
         ArrayList<ArrayList<Integer>> values = map.getValues();
         for (int y = 0; y < values.size(); y++) {
@@ -33,20 +34,19 @@ public class PathBlocker {
         }
     }
 
-    // Oyun oynanışı
     public void play() {
         Scanner scanner = new Scanner(System.in);
         boolean gameWon = false;
 
-        // İlk olarak haritanın başlangıç halini kaydet
-        saveCurrentMapState();
+        // Clear any previous winning moves
+        winningMaps.clear();
+        winningMaps.add(new Map(deepCopyValues(map.getValues()))); // Save initial state as part of winning moves
 
         while (!gameWon) {
             displayMap();
             System.out.print("Move (W/A/S/D): ");
             String input = scanner.nextLine().trim().toUpperCase();
 
-            // Hareket yönlerini belirle
             int dirX = 0, dirY = 0;
             switch (input) {
                 case "W":
@@ -62,11 +62,10 @@ public class PathBlocker {
                     dirX = 1;
                     break;
                 default:
-                    System.out.println("Geçersiz giriş! W/A/S/D kullanın.");
+                    System.out.println("Invalid input! Use W/A/S/D.");
                     continue;
             }
 
-            // Oyuncunun hareket ettiği yol
             ArrayList<int[]> path = new ArrayList<>();
             int currentX = player.getX();
             int currentY = player.getY();
@@ -81,61 +80,85 @@ public class PathBlocker {
 
                 int nextValue = map.getValues().get(nextY).get(nextX);
 
-                path.add(new int[] { currentX, currentY });
+                path.add(new int[]{currentX, currentY});
                 currentX = nextX;
                 currentY = nextY;
                 canMove = true;
 
                 if (nextValue == 2)
-                    break; // Hedefe ulaştıysa dur
+                    break;
             }
 
             if (!canMove) {
-                System.out.println("Bu yöne hareket edemezsiniz!");
+                System.out.println("You cannot move in that direction!");
                 continue;
             }
 
-            // Yol boyunca duvarları yerleştir (hedef hariç)
             for (int i = 0; i < path.size(); i++) {
                 int[] pos = path.get(i);
                 int x = pos[0];
                 int y = pos[1];
                 if (x == targetX && y == targetY)
-                    continue; // Hedefi duvar yapma
-                setCell(x, y, 1); // Duvar yap
+                    continue;
+                setCell(x, y, 1);
             }
 
-            // Oyuncuyu yeni pozisyona taşı
             movePlayer(currentX, currentY);
 
-            // Hareketten sonra haritayı PNG olarak kaydet
-            saveCurrentMapState();
+            // Save current map state if game is still in progress
+            winningMaps.add(new Map(deepCopyValues(map.getValues())));
+            moveCount++;
 
-            // Oyunun bitip bitmediğini kontrol et
             if (currentX == targetX && currentY == targetY) {
                 gameWon = true;
-                displayMap();
-                System.out.println("Tebrikler! Hedefe ulaştınız!");
+                System.out.println("Congratulations! You reached the target!");
             } else if (!hasValidMoves()) {
-                displayMap();
-                System.out.println("Hareket edebileceğiniz geçerli bir yol kalmadı! Oyun bitti.");
-                break;
+                System.out.println("No valid moves left! Resetting level...");
+                resetLevel();
             }
         }
 
+        if (gameWon) {
+            saveAllMaps();
+        } else {
+            System.out.println("No solution found.");
+        }
     }
 
-    // Geçerli harita durumunu PNG olarak kaydet
-    private void saveCurrentMapState() {
-        moveCount++;
-        String fileName = String.format("%s/%04d.png", levelFolder, moveCount);
+    private void resetLevel() {
+        moveCount = 0;
+        map = new Map(deepCopyValues(winningMaps.get(0).getValues()));
+        initializeGame();
+        winningMaps.clear();
+        winningMaps.add(new Map(deepCopyValues(map.getValues())));
+    }
+
+    private void saveInitialMapState() {
+        String fileName = String.format("%s/%04d.png", levelFolder, moveCount + 1);
         map.saveAsPng(fileName);
-        System.out.println(fileName + " kaydedildi.");
+        System.out.println(fileName + " saved.");
+        moveCount++;
     }
 
-    // Oyuncunun geçerli bir hareket yapıp yapamayacağını kontrol eder
+    private void saveAllMaps() {
+        for (int i = 0; i < winningMaps.size(); i++) {
+            String fileName = String.format("%s/%04d.png", levelFolder, i + 1);
+            winningMaps.get(i).saveAsPng(fileName);
+            System.out.println(fileName + " saved.");
+        }
+    }
+
+    private ArrayList<ArrayList<Integer>> deepCopyValues(ArrayList<ArrayList<Integer>> original) {
+        ArrayList<ArrayList<Integer>> copy = new ArrayList<>();
+        for (ArrayList<Integer> row : original) {
+            ArrayList<Integer> newRow = new ArrayList<>(row);
+            copy.add(newRow);
+        }
+        return copy;
+    }
+
     private boolean hasValidMoves() {
-        int[][] directions = { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };
+        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
         for (int[] dir : directions) {
             int x = player.getX();
             int y = player.getY();
@@ -160,27 +183,23 @@ public class PathBlocker {
         return false;
     }
 
-    // Geçerli bir hareket olup olmadığını kontrol eder
     private boolean isValidMove(int x, int y) {
         ArrayList<ArrayList<Integer>> values = map.getValues();
         if (y < 0 || y >= values.size() || x < 0 || x >= values.get(y).size()) {
             return false;
         }
-        return values.get(y).get(x) != 1; // Duvara çarpmaz
+        return values.get(y).get(x) != 1;
     }
 
-    // Bir hücrenin değerini günceller
     private void setCell(int x, int y, int value) {
         map.getValues().get(y).set(x, value);
     }
 
-    // Oyuncuyu yeni pozisyona taşır
     private void movePlayer(int x, int y) {
         setCell(x, y, 3);
         player.setPosition(x, y);
     }
 
-    // Haritayı ekrana yazdırır
     private void displayMap() {
         ArrayList<ArrayList<Integer>> values = map.getValues();
         for (ArrayList<Integer> row : values) {
@@ -191,7 +210,6 @@ public class PathBlocker {
         }
     }
 
-    // Klasörün yoksa klasör oluşturur
     private void ensureDirectoryExists(String dirPath) {
         File directory = new File(dirPath);
         if (!directory.exists()) {

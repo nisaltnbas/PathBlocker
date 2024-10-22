@@ -1,4 +1,4 @@
-public class Player {
+class Player {
     private int x;
     private int y;
 

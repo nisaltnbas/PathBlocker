@@ -47,17 +47,22 @@ public class Map {
     public void saveAsPng(String fileName) {
         int width = values.get(0).size();
         int height = values.size();
-        int borderThickness = 1;
+        int blockSize = 50; // Increase block size to create larger images
+        int borderThickness = blockSize;
 
-        BufferedImage image = new BufferedImage(width + 2 * borderThickness, height + 2 * borderThickness,
+        BufferedImage image = new BufferedImage(
+                (width * blockSize) + 2 * borderThickness, 
+                (height * blockSize) + 2 * borderThickness,
                 BufferedImage.TYPE_INT_RGB);
         Graphics g = image.getGraphics();
 
         Color borderColor = new Color(75, 0, 130);
 
+        // Draw the outer border
         g.setColor(borderColor);
         g.fillRect(0, 0, image.getWidth(), image.getHeight());
 
+        // Draw the inner map with an additional wall around it
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 int value = values.get(y).get(x);
@@ -82,7 +87,7 @@ public class Map {
                 }
 
                 g.setColor(color);
-                g.fillRect(x + borderThickness, y + borderThickness, 1, 1);
+                g.fillRect(x * blockSize + borderThickness, y * blockSize + borderThickness, blockSize, blockSize);
             }
         }
         g.dispose();
