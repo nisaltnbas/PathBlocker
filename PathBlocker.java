@@ -25,9 +25,9 @@ class PathBlocker {
         for (int y = 0; y < values.size(); y++) {
             for (int x = 0; x < values.get(y).size(); x++) {
                 int value = values.get(y).get(x);
-                if (value == 3) {
+                if (value == 3) { // 3 -> player
                     player = new Player(x, y);
-                } else if (value == 2) {
+                } else if (value == 2) { // 2 -> target
                     targetX = x;
                     targetY = y;
                 }
@@ -36,21 +36,25 @@ class PathBlocker {
     }
 
     public void play() {
-        Queue<GameState> queue = new LinkedList<>();
+        // We create a queue, BFS method
+        Queue<State> queue = new LinkedList<>();
+
+        // We use a set to keep track of the states we visit so we don't go to the same
+        // place again
         Set<String> visited = new HashSet<>();
 
         // Initialize the initial state
         ArrayList<String> initialMoves = new ArrayList<>();
         ArrayList<ArrayList<Integer>> initialMapValues = deepCopyValues(map.getValues());
-        GameState initialState = new GameState(player.getX(), player.getY(), initialMapValues, initialMoves);
+        State initialState = new GameState(player.getX(), player.getY(), initialMapValues, initialMoves);
         queue.add(initialState);
         visited.add(initialState.getUniqueIdentifier());
 
         boolean solutionFound = false;
-        GameState finalState = null;
+        State finalState = null;
 
         while (!queue.isEmpty()) {
-            GameState currentState = queue.poll();
+            State currentState = queue.poll();
 
             if (currentState.getPlayerX() == targetX && currentState.getPlayerY() == targetY) {
                 solutionFound = true;
@@ -58,25 +62,28 @@ class PathBlocker {
                 break;
             }
 
-            // Try moving in all directions
-            String[] directions = {"W", "A", "S", "D"};
-            int[][] dirVectors = {{0, -1}, {-1, 0}, {0, 1}, {1, 0}};
+            // Directions that can be moved and their coordinate changes
+            String[] directions = { "W", "A", "S", "D" };
+            int[][] dirVectors = { { 0, -1 }, { -1, 0 }, { 0, 1 }, { 1, 0 } };
 
+            // We try to move in all directions (W, A, S, D)
             for (int i = 0; i < directions.length; i++) {
                 String move = directions[i];
                 int dirX = dirVectors[i][0];
                 int dirY = dirVectors[i][1];
 
                 // Simulate the move
-                GameState nextState = simulateMove(currentState, dirX, dirY, move);
+                State nextState = simulateMove(currentState, dirX, dirY, move);
 
+                // If the move is valid and we haven't been to this situation before
                 if (nextState != null && !visited.contains(nextState.getUniqueIdentifier())) {
-                    queue.add(nextState);
-                    visited.add(nextState.getUniqueIdentifier());
+                    queue.add(nextState);// We add the new state to the queue
+                    visited.add(nextState.getUniqueIdentifier());// We mark it as visited
                 }
             }
         }
-
+        // If a solution is found, we print how many moves it was found and play the
+        // solution again.
         if (solutionFound) {
             System.out.println("Solution found in " + finalState.getMoves().size() + " moves.");
             // Replay the moves to save the maps
@@ -86,7 +93,7 @@ class PathBlocker {
         }
     }
 
-    private GameState simulateMove(GameState currentState, int dirX, int dirY, String move) {
+    private State simulateMove(State currentState, int dirX, int dirY, String move) {
         int currentX = currentState.getPlayerX();
         int currentY = currentState.getPlayerY();
         ArrayList<ArrayList<Integer>> values = deepCopyValues(currentState.getMapValues());
@@ -127,7 +134,7 @@ class PathBlocker {
         ArrayList<String> newMoves = new ArrayList<>(currentState.getMoves());
         newMoves.add(move);
 
-        GameState nextState = new GameState(currentX, currentY, values, newMoves);
+        State nextState = new GameState(currentX, currentY, values, newMoves);
         return nextState;
     }
 
@@ -253,64 +260,6 @@ class PathBlocker {
         }
     }
 
-    // Abstract State class
-    abstract class State {
-        protected ArrayList<ArrayList<Integer>> mapValues;
-        protected ArrayList<String> moves;
-
-        public State(ArrayList<ArrayList<Integer>> mapValues, ArrayList<String> moves) {
-            this.mapValues = mapValues;
-            this.moves = moves;
-        }
-
-        public ArrayList<ArrayList<Integer>> getMapValues() {
-            return mapValues;
-        }
-
-        public ArrayList<String> getMoves() {
-            return moves;
-        }
-
-        public abstract String getUniqueIdentifier();
-    }
-
-    // Concrete subclass extending State
-    class GameState extends State {
-        private int playerX;
-        private int playerY;
-
-        public GameState(int playerX, int playerY, ArrayList<ArrayList<Integer>> mapValues, ArrayList<String> moves) {
-            super(mapValues, moves);
-            this.playerX = playerX;
-            this.playerY = playerY;
-        }
-
-        public int getPlayerX() {
-            return playerX;
-        }
-
-        public int getPlayerY() {
-            return playerY;
-        }
-
-        @Override
-        public String getUniqueIdentifier() {
-            // Unique identifier combining player position and blocked cells
-            StringBuilder sb = new StringBuilder();
-            sb.append(playerX).append(',').append(playerY).append(';');
-            // Serialize only the blocked cells
-            for (int y = 0; y < mapValues.size(); y++) {
-                for (int x = 0; x < mapValues.get(y).size(); x++) {
-                    int cell = mapValues.get(y).get(x);
-                    if (cell == 1) {
-                        sb.append(x).append(',').append(y).append(';');
-                    }
-                }
-            }
-            return sb.toString();
-        }
-    }
-
     public static void main(String[] args) {
         String[] filePaths = {
                 "level1.txt", "level2.txt", "level3.txt", "level4.txt", "level5.txt",
@@ -326,4 +275,30 @@ class PathBlocker {
             game.play();
         }
     }
+
+    /*
+     * 1) Why you prefer the search algorithm you choose? We prefer Breadth-First
+     * Search (BFS) because it explores all possible states in an organized way,
+     * going level by level. This approach ensures that you find the shortest path
+     * to the target, guaranteeing the most efficient solution with the least number
+     * of moves.
+     * 2) Can you achieve the optimal result? Why? Why not? Yes, because BFS
+     * examines all possible paths at each step and thus ensures that the goal is
+     * reached by the shortest path. In other words, it offers an optimal solution.
+     * 3) How you achieved efficiency for keeping the states? By using a hash set of
+     * unique state identifiers (combining the player's position and blocked cells),
+     * the algorithm avoids revisiting the same states, thus reducing unnecessary
+     * computations.
+     * 4) If you prefer to use DFS (tree version) then do you need to avoid cycles?
+     * When using Depth-First Search (DFS), it's crucial to watch out for cycles. If
+     * you don't check for them, DFS can end up going in circles, revisiting the
+     * same states over and over. This can lead to infinite loops and unnecessary
+     * work, making the search inefficient.
+     * 5) What will be the path-cost for this problem? Path cost is the total number
+     * of moves needed to get from the starting position to the target. Since all
+     * moves cost the same, the path cost is just the number of moves in the
+     * sequence that leads to the goal.
+     * 
+     */
+
 }

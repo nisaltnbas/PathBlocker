@@ -47,11 +47,10 @@ public class ChartMap {
     public void saveAsPng(String fileName) {
         int width = values.get(0).size();
         int height = values.size();
-        int blockSize = 50; // Increase block size to create larger images
-        
+        int blockSize = 10;
 
         BufferedImage image = new BufferedImage(
-                (width * blockSize) + 2 * blockSize, 
+                (width * blockSize) + 2 * blockSize,
                 (height * blockSize) + 2 * blockSize,
                 BufferedImage.TYPE_INT_RGB);
         Graphics g = image.getGraphics();
@@ -87,15 +86,13 @@ public class ChartMap {
                 }
 
                 g.setColor(color);
-                // +1 values give us the blocks around the map
-                g.fillRect( (x+1) * blockSize, (y+1) * blockSize , blockSize, blockSize);
+                g.fillRect((x + 1) * blockSize, (y + 1) * blockSize, blockSize, blockSize);
             }
         }
         g.dispose();
 
         try {
             ImageIO.write(image, "png", new File(fileName));
-            System.out.println(fileName + " has been saved.");
         } catch (IOException e) {
             e.printStackTrace();
         }
