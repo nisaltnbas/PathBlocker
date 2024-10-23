@@ -1,6 +1,5 @@
 import java.util.ArrayList;
 
-// Abstract State class
 abstract class State {
     protected int playerX;
     protected int playerY;

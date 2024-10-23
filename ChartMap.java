@@ -47,7 +47,7 @@ public class ChartMap {
     public void saveAsPng(String fileName) {
         int width = values.get(0).size();
         int height = values.size();
-        int blockSize = 50;
+        int blockSize = 10;
 
         BufferedImage image = new BufferedImage(
                 (width * blockSize) + 2 * blockSize,
