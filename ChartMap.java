@@ -10,6 +10,7 @@ import javax.imageio.ImageIO;
 
 public class ChartMap {
     private ArrayList<ArrayList<Integer>> values;
+    private Elevation elevation;
 
     public ChartMap(ArrayList<ArrayList<Integer>> values) {
         this.values = values;
@@ -47,38 +48,33 @@ public class ChartMap {
     public void saveAsPng(String fileName) {
         int width = values.get(0).size();
         int height = values.size();
-        int blockSize = 10;
+        int blockSize = 40;
 
         BufferedImage image = new BufferedImage(
-                (width * blockSize) + 2 * blockSize,
-                (height * blockSize) + 2 * blockSize,
+                width * blockSize,
+                height * blockSize,
                 BufferedImage.TYPE_INT_RGB);
         Graphics g = image.getGraphics();
 
-        Color borderColor = new Color(75, 0, 130);
-
-        // Draw the outer border
-        g.setColor(borderColor);
-        g.fillRect(0, 0, image.getWidth(), image.getHeight());
-
-        // Draw the inner map with an additional wall around it
+        // Draw the map
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 int value = values.get(y).get(x);
                 Color color;
 
                 switch (value) {
-                    case 0:
-                        color = new Color(128, 128, 255);
+                    case 0: // Empty cell - gray gradient based on elevation
+                        int elevation = getElevationColor(x, y);
+                        color = new Color(elevation, elevation, elevation);
                         break;
-                    case 1:
-                        color = new Color(75, 0, 130);
+                    case 1: // Wall - dark red
+                        color = new Color(139, 0, 0); // Dark red
                         break;
-                    case 2:
-                        color = new Color(128, 128, 128);
+                    case 2: // Target - blue
+                        color = new Color(0, 0, 255);
                         break;
-                    case 3:
-                        color = Color.YELLOW;
+                    case 3: // Player - green
+                        color = new Color(0, 255, 0);
                         break;
                     default:
                         color = Color.WHITE;
@@ -86,7 +82,11 @@ public class ChartMap {
                 }
 
                 g.setColor(color);
-                g.fillRect((x + 1) * blockSize, (y + 1) * blockSize, blockSize, blockSize);
+                g.fillRect(x * blockSize, y * blockSize, blockSize, blockSize);
+
+                // Draw grid lines
+                g.setColor(Color.DARK_GRAY);
+                g.drawRect(x * blockSize, y * blockSize, blockSize, blockSize);
             }
         }
         g.dispose();
@@ -96,5 +96,20 @@ public class ChartMap {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public void setElevation(Elevation elevation) {
+        this.elevation = elevation;
+    }
+
+    private int getElevationColor(int x, int y) {
+        if (elevation != null) {
+            int height = elevation.getHeight(x, y);
+            // Yüksekliğe göre daha koyu gri tonları (0=en açık, 9=en koyu)
+            int baseGray = 180; // Başlangıç gri tonu (daha açık)
+            int step = 15; // Her yükseklik için koyulaşma miktarı
+            return Math.max(baseGray - (height * step), 60); // En koyu 60 olsun
+        }
+        return 128; // Elevation yoksa orta gri
     }
 }

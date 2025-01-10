@@ -9,14 +9,24 @@ class PathBlocker {
     private int moveCount = 0;
     private String levelFolder;
     private ArrayList<ChartMap> winningMaps = new ArrayList<>();
+    private Elevation elevation;
 
     public PathBlocker(ChartMap map, String levelFolder) {
         this.map = map;
         this.levelFolder = levelFolder;
+        this.elevation = new Elevation(map.getValues().size(), 5);
         initializeGame();
         ensureDirectoryExists(levelFolder);
-        // Initialize winningMaps with the initial map state
-        winningMaps.add(new ChartMap(deepCopyValues(map.getValues())));
+
+        // İlk haritayı elevation ile birlikte kaydet
+        map.setElevation(elevation);
+        ChartMap initialMap = new ChartMap(deepCopyValues(map.getValues()));
+        initialMap.setElevation(elevation);
+        winningMaps.add(initialMap);
+
+        System.out.println("Elevation Map:");
+        System.out.println(elevation.toString());
+
         saveInitialMapState();
     }
 
@@ -36,25 +46,26 @@ class PathBlocker {
     }
 
     public void play() {
-        // We create a queue, BFS method
-        Queue<State> queue = new LinkedList<>();
+        // Priority queue ordered by f(n) = g(n) + h(n)
+        PriorityQueue<State> openSet = new PriorityQueue<>((a, b) -> {
+            int f1 = a.getTotalCost() + manhattanDistance(a.getPlayerX(), a.getPlayerY(), targetX, targetY);
+            int f2 = b.getTotalCost() + manhattanDistance(b.getPlayerX(), b.getPlayerY(), targetX, targetY);
+            return Integer.compare(f1, f2);
+        });
 
-        // We use a set to keep track of the states we visit so we don't go to the same
-        // place again
         Set<String> visited = new HashSet<>();
 
-        // Initialize the initial state
+        // Initialize starting state
         ArrayList<String> initialMoves = new ArrayList<>();
         ArrayList<ArrayList<Integer>> initialMapValues = deepCopyValues(map.getValues());
-        State initialState = new GameState(player.getX(), player.getY(), initialMapValues, initialMoves);
-        queue.add(initialState);
-        visited.add(initialState.getUniqueIdentifier());
+        State initialState = new GameState(player.getX(), player.getY(), initialMapValues, initialMoves, 0);
+        openSet.add(initialState);
 
-        boolean solutionFound = false;
         State finalState = null;
+        boolean solutionFound = false;
 
-        while (!queue.isEmpty()) {
-            State currentState = queue.poll();
+        while (!openSet.isEmpty()) {
+            State currentState = openSet.poll();
 
             if (currentState.getPlayerX() == targetX && currentState.getPlayerY() == targetY) {
                 solutionFound = true;
@@ -62,45 +73,47 @@ class PathBlocker {
                 break;
             }
 
-            // Directions that can be moved and their coordinate changes
+            String stateId = currentState.getUniqueIdentifier();
+            if (visited.contains(stateId))
+                continue;
+            visited.add(stateId);
+
+            // Try all possible moves
             String[] directions = { "W", "A", "S", "D" };
             int[][] dirVectors = { { 0, -1 }, { -1, 0 }, { 0, 1 }, { 1, 0 } };
 
-            // We try to move in all directions (W, A, S, D)
             for (int i = 0; i < directions.length; i++) {
                 String move = directions[i];
                 int dirX = dirVectors[i][0];
                 int dirY = dirVectors[i][1];
 
-                // Simulate the move
                 State nextState = simulateMove(currentState, dirX, dirY, move);
-
-                // If the move is valid and we haven't been to this situation before
                 if (nextState != null && !visited.contains(nextState.getUniqueIdentifier())) {
-                    queue.add(nextState);// We add the new state to the queue
-                    visited.add(nextState.getUniqueIdentifier());// We mark it as visited
+                    openSet.add(nextState);
                 }
             }
         }
-        // If a solution is found, we print how many moves it was found and play the
-        // solution again.
+
         if (solutionFound) {
-            System.out.println("Solution found in " + finalState.getMoves().size() + " moves.");
-            // Replay the moves to save the maps
+            System.out.println("Solution found with total cost: " + finalState.getTotalCost());
             replaySolution(finalState.getMoves());
+            return;
         } else {
             System.out.println("No solution found.");
         }
+    }
+
+    private int manhattanDistance(int x1, int y1, int x2, int y2) {
+        return Math.abs(x1 - x2) + Math.abs(y1 - y2);
     }
 
     private State simulateMove(State currentState, int dirX, int dirY, String move) {
         int currentX = currentState.getPlayerX();
         int currentY = currentState.getPlayerY();
         ArrayList<ArrayList<Integer>> values = deepCopyValues(currentState.getMapValues());
+        int totalCost = currentState.getTotalCost();
 
-        // Turn the player's starting position into a wall
         values.get(currentY).set(currentX, 1);
-
         boolean canMove = false;
 
         while (true) {
@@ -111,15 +124,19 @@ class PathBlocker {
                 break;
 
             int nextValue = values.get(nextY).get(nextX);
+            int heightCost = elevation.getMovementCost(nextX, nextY);
+            totalCost += heightCost;
+            System.out.printf("Moving to (%d,%d) with height %d, cost: %d\n",
+                    nextX, nextY, elevation.getHeight(nextX, nextY), heightCost);
 
             currentX = nextX;
             currentY = nextY;
             canMove = true;
 
-            if (nextValue == 2)
+            if (nextValue == 2) {
                 break;
+            }
 
-            // Turn the traversed cell into a wall
             values.get(currentY).set(currentX, 1);
         }
 
@@ -127,15 +144,11 @@ class PathBlocker {
             return null;
         }
 
-        // Move the player to the new position
         values.get(currentY).set(currentX, 3);
-
-        // Update moves
         ArrayList<String> newMoves = new ArrayList<>(currentState.getMoves());
         newMoves.add(move);
 
-        State nextState = new GameState(currentX, currentY, values, newMoves);
-        return nextState;
+        return new GameState(currentX, currentY, values, newMoves, totalCost);
     }
 
     private boolean isValidMove(int x, int y, ArrayList<ArrayList<Integer>> values) {
@@ -156,6 +169,14 @@ class PathBlocker {
         winningMaps.add(new ChartMap(deepCopyValues(map.getValues()))); // Save initial state
 
         moveCount = 0;
+        boolean reachedTarget = false;
+
+        // İlk durumu kaydet
+        ChartMap initialMap = new ChartMap(deepCopyValues(map.getValues()));
+        initialMap.setElevation(elevation);
+        winningMaps.add(initialMap);
+        saveMapWithElevation(String.format("%s/%04d.png", levelFolder, moveCount));
+        moveCount++;
 
         for (String move : moves) {
             int dirX = 0, dirY = 0;
@@ -195,8 +216,10 @@ class PathBlocker {
                 currentY = nextY;
                 canMove = true;
 
-                if (nextValue == 2)
+                if (nextValue == 2) {
+                    reachedTarget = true;
                     break;
+                }
 
                 // Turn the traversed cell into a wall
                 setCell(currentX, currentY, 1);
@@ -204,34 +227,33 @@ class PathBlocker {
 
             if (!canMove) {
                 System.out.println("Cannot move!");
-                break;
+                return;
             }
 
             // Move player
             movePlayer(currentX, currentY);
 
-            // Save current map state
-            winningMaps.add(new ChartMap(deepCopyValues(map.getValues())));
+            // Sadece bir kere kaydet
+            ChartMap newMap = new ChartMap(deepCopyValues(map.getValues()));
+            newMap.setElevation(elevation);
+            winningMaps.add(newMap);
+            saveMapWithElevation(String.format("%s/%04d.png", levelFolder, moveCount));
             moveCount++;
+
+            if (reachedTarget) {
+                System.out.println("Target reached! Moving to next level...");
+                return; // saveAllMaps() çağrısını kaldırdık
+            }
         }
 
-        // Save all maps
-        saveAllMaps();
+        // saveAllMaps() çağrısını kaldırdık çünkü her adımda zaten kaydediyoruz
     }
 
     private void saveInitialMapState() {
         String fileName = String.format("%s/%04d.png", levelFolder, moveCount);
-        map.saveAsPng(fileName);
+        saveMapWithElevation(fileName);
         System.out.println(fileName + " saved.");
         moveCount++;
-    }
-
-    private void saveAllMaps() {
-        for (int i = 0; i < winningMaps.size(); i++) {
-            String fileName = String.format("%s/%04d.png", levelFolder, i);
-            winningMaps.get(i).saveAsPng(fileName);
-            System.out.println(fileName + " saved.");
-        }
     }
 
     private ArrayList<ArrayList<Integer>> deepCopyValues(ArrayList<ArrayList<Integer>> original) {
@@ -270,9 +292,14 @@ class PathBlocker {
 
         for (int i = 0; i < maps.size(); i++) {
             String levelFolder = String.format("level%02d", i + 1);
+            System.out.println("\nStarting Level " + (i + 1));
             ChartMap map = maps.get(i);
             PathBlocker game = new PathBlocker(map, levelFolder);
             game.play();
+
+            if (i == maps.size() - 1) {
+                System.out.println("Game completed! All levels finished!");
+            }
         }
     }
 
@@ -300,5 +327,10 @@ class PathBlocker {
      * sequence that leads to the goal.
      * 
      */
+
+    public void saveMapWithElevation(String fileName) {
+        map.setElevation(elevation);
+        map.saveAsPng(fileName);
+    }
 
 }

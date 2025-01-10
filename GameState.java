@@ -1,10 +1,10 @@
-
 import java.util.ArrayList;
 
 class GameState extends State {
 
-    public GameState(int playerX, int playerY, ArrayList<ArrayList<Integer>> mapValues, ArrayList<String> moves) {
-        super(playerX, playerY, mapValues, moves);
+    public GameState(int playerX, int playerY, ArrayList<ArrayList<Integer>> mapValues, ArrayList<String> moves,
+            int totalCost) {
+        super(playerX, playerY, mapValues, moves, totalCost);
     }
 
     @Override
