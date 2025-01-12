@@ -41,8 +41,15 @@ public class ChartMap {
 
         for (String filePath : filePaths) {
             String fullPath = FileUtil.getProjectPath(filePath);
+            File file = new File(fullPath);
+
+            if (!file.exists()) {
+                System.err.println("File not found: " + fullPath);
+                continue;
+            }
+
             ArrayList<ArrayList<Integer>> values = new ArrayList<>();
-            try (BufferedReader br = new BufferedReader(new FileReader(fullPath))) {
+            try (BufferedReader br = new BufferedReader(new FileReader(file))) {
                 String line;
                 while ((line = br.readLine()) != null) {
                     String[] tokens = line.trim().split("\\s+");
@@ -52,11 +59,21 @@ public class ChartMap {
                     }
                     values.add(rowValues);
                 }
+
+                if (!values.isEmpty()) {
+                    maps.add(new ChartMap(values));
+                }
             } catch (IOException e) {
                 System.err.println("Error reading file: " + fullPath);
                 e.printStackTrace();
+            } catch (NumberFormatException e) {
+                System.err.println("Error parsing numbers in file: " + fullPath);
+                e.printStackTrace();
             }
-            maps.add(new ChartMap(values));
+        }
+
+        if (maps.isEmpty()) {
+            throw new IllegalStateException("No valid maps could be loaded!");
         }
 
         return maps;

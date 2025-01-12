@@ -282,35 +282,40 @@ public class PathBlocker {
 
     public static void main(String[] args) {
         String[] filePaths = {
-                "level1.txt", "level2.txt", "level3.txt", "level4.txt", "level5.txt",
-                "level6.txt", "level7.txt", "level8.txt", "level9.txt", "level10.txt"
+                "levels/level1.txt", "levels/level2.txt", "levels/level3.txt", "levels/level4.txt", "levels/level5.txt",
+                "levels/level6.txt", "levels/level7.txt", "levels/level8.txt", "levels/level9.txt", "levels/level10.txt"
         };
 
-        ArrayList<ChartMap> maps = ChartMap.readMaps(filePaths);
-        int totalCost = 0;
-
-        // Create solutions directory
+        // Create directories
+        FileUtil.ensureDirectoryExists("levels");
         FileUtil.ensureDirectoryExists("solutions");
-        System.out.println("Starting PathBlocker game...\n");
 
-        for (int i = 0; i < maps.size(); i++) {
-            String levelFolder = String.format("solutions/level%02d", i + 1);
-            System.out.println("Starting Level " + (i + 1) + "...");
-            ChartMap map = maps.get(i);
-            PathBlocker game = new PathBlocker(map, levelFolder);
-            game.play();
-
-            int levelCost = game.getFinalCost();
-            if (levelCost != -1) {
-                totalCost += levelCost;
-                System.out.println("Level " + (i + 1) + " completed! Cost: " + levelCost);
-            } else {
-                System.out.println("Level " + (i + 1) + " could not be completed.");
+        try {
+            ArrayList<ChartMap> maps = ChartMap.readMaps(filePaths);
+            if (maps.isEmpty()) {
+                System.err.println("No maps were loaded. Please check the level files in the 'levels' directory.");
+                return;
             }
-            System.out.println();
-        }
 
-        System.out.println("Game completed!");
-        System.out.println("Total cost for all levels: " + totalCost);
+            int totalCost = 0;
+            for (int i = 0; i < maps.size(); i++) {
+                String levelFolder = String.format("solutions/level%02d", i + 1);
+                System.out.println("Level " + (i + 1));
+                ChartMap map = maps.get(i);
+                PathBlocker game = new PathBlocker(map, levelFolder);
+                game.play();
+
+                int levelCost = game.getFinalCost();
+                if (levelCost != -1) {
+                    totalCost += levelCost;
+                    System.out.println("Level " + (i + 1) + " completed. Cost: " + levelCost + "\n");
+                }
+            }
+
+            System.out.println("Total cost: " + totalCost);
+        } catch (Exception e) {
+            System.err.println("An error occurred while running the game:");
+            e.printStackTrace();
+        }
     }
 }
