@@ -1,7 +1,11 @@
-import java.util.*;
-import java.io.File;
+package game;
 
-class PathBlocker {
+import java.util.*;
+import game.graphics.ChartMap;
+import game.model.*;
+import game.util.FileUtil;
+
+public class PathBlocker {
     private ChartMap map;
     private Player player;
     private int targetX;
@@ -12,14 +16,53 @@ class PathBlocker {
     private Elevation elevation;
     private int finalCost = -1;
 
+    /*
+     * Solution Characteristics:
+     * 
+     * 1. Optimality:
+     * - The solution uses A* search algorithm (f(n) = g(n) + h(n))
+     * - g(n): Actual cost from start to current state (including elevation costs)
+     * - h(n): Manhattan distance heuristic to estimate remaining cost
+     * - Since Manhattan distance is admissible (never overestimates), A* guarantees
+     * optimal solution
+     * 
+     * 2. Space Efficiency:
+     * Advantages:
+     * - Uses HashSet for visited states to prevent cycles and repeated states
+     * - Only stores necessary state information (player position, map state, moves)
+     * Disadvantages:
+     * - Stores complete map state for each node, which can be memory intensive
+     * - Keeps track of all winning maps for visualization
+     * 
+     * 3. Time Efficiency:
+     * Advantages:
+     * - A* explores promising paths first, reducing unnecessary exploration
+     * - Quick state comparison using unique identifiers
+     * - Efficient move validation using array bounds checking
+     * Disadvantages:
+     * - Must explore all equally promising paths until finding goal
+     * - Deep copying map states for each new state is expensive
+     * - Saving PNG files for visualization adds overhead
+     * 
+     * 4. Overall Approach:
+     * Advantages:
+     * - Guarantees shortest path (optimal solution)
+     * - Handles elevation costs correctly
+     * - Provides visual representation of solution
+     * - Prevents infinite loops with visited states tracking
+     * Disadvantages:
+     * - Higher memory usage compared to simpler algorithms like DFS
+     * - May be slower for simple cases where simpler algorithms would suffice
+     * - Storage overhead for visualization purposes
+     */
+
     public PathBlocker(ChartMap map, String levelFolder) {
         this.map = map;
-        this.levelFolder = levelFolder;
+        this.levelFolder = FileUtil.getProjectPath(levelFolder);
         this.elevation = new Elevation(map.getValues().size(), 5);
         initializeGame();
-        ensureDirectoryExists(levelFolder);
+        FileUtil.ensureDirectoryExists(this.levelFolder);
 
-        // İlk haritayı elevation ile birlikte kaydet
         map.setElevation(elevation);
         ChartMap initialMap = new ChartMap(deepCopyValues(map.getValues()));
         initialMap.setElevation(elevation);
@@ -33,9 +76,9 @@ class PathBlocker {
         for (int y = 0; y < values.size(); y++) {
             for (int x = 0; x < values.get(y).size(); x++) {
                 int value = values.get(y).get(x);
-                if (value == 3) { // 3 -> player
+                if (value == CellType.PLAYER.getValue()) {
                     player = new Player(x, y);
-                } else if (value == 2) { // 2 -> target
+                } else if (value == CellType.TARGET.getValue()) {
                     targetX = x;
                     targetY = y;
                 }
@@ -44,7 +87,6 @@ class PathBlocker {
     }
 
     public void play() {
-        // Priority queue ordered by f(n) = g(n) + h(n)
         PriorityQueue<State> openSet = new PriorityQueue<>((a, b) -> {
             int f1 = a.getTotalCost() + manhattanDistance(a.getPlayerX(), a.getPlayerY(), targetX, targetY);
             int f2 = b.getTotalCost() + manhattanDistance(b.getPlayerX(), b.getPlayerY(), targetX, targetY);
@@ -52,11 +94,8 @@ class PathBlocker {
         });
 
         Set<String> visited = new HashSet<>();
-
-        // Initialize starting state
-        ArrayList<String> initialMoves = new ArrayList<>();
-        ArrayList<ArrayList<Integer>> initialMapValues = deepCopyValues(map.getValues());
-        State initialState = new GameState(player.getX(), player.getY(), initialMapValues, initialMoves, 0);
+        State initialState = new GameState(player.getX(), player.getY(), deepCopyValues(map.getValues()),
+                new ArrayList<>(), 0);
         openSet.add(initialState);
 
         State finalState = null;
@@ -72,20 +111,13 @@ class PathBlocker {
             }
 
             String stateId = currentState.getUniqueIdentifier();
-            if (visited.contains(stateId))
+            if (visited.contains(stateId)) {
                 continue;
+            }
             visited.add(stateId);
 
-            // Try all possible moves
-            String[] directions = { "W", "A", "S", "D" };
-            int[][] dirVectors = { { 0, -1 }, { -1, 0 }, { 0, 1 }, { 1, 0 } };
-
-            for (int i = 0; i < directions.length; i++) {
-                String move = directions[i];
-                int dirX = dirVectors[i][0];
-                int dirY = dirVectors[i][1];
-
-                State nextState = simulateMove(currentState, dirX, dirY, move);
+            for (Direction direction : Direction.values()) {
+                State nextState = simulateMove(currentState, direction);
                 if (nextState != null && !visited.contains(nextState.getUniqueIdentifier())) {
                     openSet.add(nextState);
                 }
@@ -94,11 +126,7 @@ class PathBlocker {
 
         if (solutionFound) {
             finalCost = finalState.getTotalCost();
-            System.out.println("Level cost: " + finalCost);
             replaySolution(finalState.getMoves());
-            return;
-        } else {
-            System.out.println("No solution found.");
         }
     }
 
@@ -106,21 +134,22 @@ class PathBlocker {
         return Math.abs(x1 - x2) + Math.abs(y1 - y2);
     }
 
-    private State simulateMove(State currentState, int dirX, int dirY, String move) {
+    private State simulateMove(State currentState, Direction direction) {
         int currentX = currentState.getPlayerX();
         int currentY = currentState.getPlayerY();
         ArrayList<ArrayList<Integer>> values = deepCopyValues(currentState.getMapValues());
         int totalCost = currentState.getTotalCost();
 
-        values.get(currentY).set(currentX, 1);
+        values.get(currentY).set(currentX, CellType.WALL.getValue());
         boolean canMove = false;
 
         while (true) {
-            int nextX = currentX + dirX;
-            int nextY = currentY + dirY;
+            int nextX = currentX + direction.getDx();
+            int nextY = currentY + direction.getDy();
 
-            if (!isValidMove(nextX, nextY, values))
+            if (!isValidMove(nextX, nextY, values)) {
                 break;
+            }
 
             int nextValue = values.get(nextY).get(nextX);
             int heightCost = elevation.getMovementCost(nextX, nextY);
@@ -130,20 +159,20 @@ class PathBlocker {
             currentY = nextY;
             canMove = true;
 
-            if (nextValue == 2) {
+            if (nextValue == CellType.TARGET.getValue()) {
                 break;
             }
 
-            values.get(currentY).set(currentX, 1);
+            values.get(currentY).set(currentX, CellType.WALL.getValue());
         }
 
         if (!canMove) {
             return null;
         }
 
-        values.get(currentY).set(currentX, 3);
+        values.get(currentY).set(currentX, CellType.PLAYER.getValue());
         ArrayList<String> newMoves = new ArrayList<>(currentState.getMoves());
-        newMoves.add(move);
+        newMoves.add(direction.getKey());
 
         return new GameState(currentX, currentY, values, newMoves, totalCost);
     }
@@ -152,60 +181,40 @@ class PathBlocker {
         if (y < 0 || y >= values.size() || x < 0 || x >= values.get(y).size()) {
             return false;
         }
-        int cellValue = values.get(y).get(x);
-        return cellValue != 1;
+        return values.get(y).get(x) != CellType.WALL.getValue();
     }
 
     private void replaySolution(ArrayList<String> moves) {
-        // Reset the map to initial state
         map = new ChartMap(deepCopyValues(winningMaps.get(0).getValues()));
         initializeGame();
-
-        // Clear any previous winning moves
         winningMaps.clear();
-        winningMaps.add(new ChartMap(deepCopyValues(map.getValues()))); // Save initial state
+        winningMaps.add(new ChartMap(deepCopyValues(map.getValues())));
 
         moveCount = 0;
         boolean reachedTarget = false;
 
-        // İlk durumu kaydet
         ChartMap initialMap = new ChartMap(deepCopyValues(map.getValues()));
         initialMap.setElevation(elevation);
         winningMaps.add(initialMap);
         saveMapWithElevation(String.format("%s/%04d.png", levelFolder, moveCount));
         moveCount++;
 
-        for (String move : moves) {
-            int dirX = 0, dirY = 0;
-            switch (move) {
-                case "W":
-                    dirY = -1;
-                    break;
-                case "S":
-                    dirY = 1;
-                    break;
-                case "A":
-                    dirX = -1;
-                    break;
-                case "D":
-                    dirX = 1;
-                    break;
-            }
-
+        for (String moveKey : moves) {
+            Direction direction = Direction.fromKey(moveKey);
             int currentX = player.getX();
             int currentY = player.getY();
 
-            // Turn the player's starting position into a wall
-            setCell(currentX, currentY, 1);
+            setCell(currentX, currentY, CellType.WALL.getValue());
 
             boolean canMove = false;
 
             while (true) {
-                int nextX = currentX + dirX;
-                int nextY = currentY + dirY;
+                int nextX = currentX + direction.getDx();
+                int nextY = currentY + direction.getDy();
 
-                if (!isValidMove(nextX, nextY, map.getValues()))
+                if (!isValidMove(nextX, nextY, map.getValues())) {
                     break;
+                }
 
                 int nextValue = map.getValues().get(nextY).get(nextX);
 
@@ -213,24 +222,20 @@ class PathBlocker {
                 currentY = nextY;
                 canMove = true;
 
-                if (nextValue == 2) {
+                if (nextValue == CellType.TARGET.getValue()) {
                     reachedTarget = true;
                     break;
                 }
 
-                // Turn the traversed cell into a wall
-                setCell(currentX, currentY, 1);
+                setCell(currentX, currentY, CellType.WALL.getValue());
             }
 
             if (!canMove) {
-                System.out.println("Cannot move!");
                 return;
             }
 
-            // Move player
             movePlayer(currentX, currentY);
 
-            // Sadece bir kere kaydet
             ChartMap newMap = new ChartMap(deepCopyValues(map.getValues()));
             newMap.setElevation(elevation);
             winningMaps.add(newMap);
@@ -238,26 +243,21 @@ class PathBlocker {
             moveCount++;
 
             if (reachedTarget) {
-                System.out.println("Target reached! Moving to next level...");
-                return; // saveAllMaps() çağrısını kaldırdık
+                return;
             }
         }
-
-        // saveAllMaps() çağrısını kaldırdık çünkü her adımda zaten kaydediyoruz
     }
 
     private void saveInitialMapState() {
         String fileName = String.format("%s/%04d.png", levelFolder, moveCount);
         saveMapWithElevation(fileName);
-        System.out.println(fileName + " saved.");
         moveCount++;
     }
 
     private ArrayList<ArrayList<Integer>> deepCopyValues(ArrayList<ArrayList<Integer>> original) {
         ArrayList<ArrayList<Integer>> copy = new ArrayList<>();
         for (ArrayList<Integer> row : original) {
-            ArrayList<Integer> newRow = new ArrayList<>(row);
-            copy.add(newRow);
+            copy.add(new ArrayList<>(row));
         }
         return copy;
     }
@@ -267,16 +267,17 @@ class PathBlocker {
     }
 
     private void movePlayer(int x, int y) {
-        // The previous position is already turned into a wall
-        setCell(x, y, 3);
+        setCell(x, y, CellType.PLAYER.getValue());
         player.setPosition(x, y);
     }
 
-    private void ensureDirectoryExists(String dirPath) {
-        File directory = new File(dirPath);
-        if (!directory.exists()) {
-            directory.mkdirs();
-        }
+    private void saveMapWithElevation(String fileName) {
+        map.setElevation(elevation);
+        map.saveAsPng(fileName);
+    }
+
+    public int getFinalCost() {
+        return finalCost;
     }
 
     public static void main(String[] args) {
@@ -288,59 +289,28 @@ class PathBlocker {
         ArrayList<ChartMap> maps = ChartMap.readMaps(filePaths);
         int totalCost = 0;
 
+        // Create solutions directory
+        FileUtil.ensureDirectoryExists("solutions");
+        System.out.println("Starting PathBlocker game...\n");
+
         for (int i = 0; i < maps.size(); i++) {
-            String levelFolder = String.format("level%02d", i + 1);
-            System.out.println("\nLevel " + (i + 1));
+            String levelFolder = String.format("solutions/level%02d", i + 1);
+            System.out.println("Starting Level " + (i + 1) + "...");
             ChartMap map = maps.get(i);
             PathBlocker game = new PathBlocker(map, levelFolder);
             game.play();
 
-            // Her level tamamlandığında completed yaz
-            System.out.println("Level " + (i + 1) + " completed!");
-
-            // Total cost'u güncelle
-            if (game.getFinalCost() != -1) {
-                totalCost += game.getFinalCost();
+            int levelCost = game.getFinalCost();
+            if (levelCost != -1) {
+                totalCost += levelCost;
+                System.out.println("Level " + (i + 1) + " completed! Cost: " + levelCost);
+            } else {
+                System.out.println("Level " + (i + 1) + " could not be completed.");
             }
+            System.out.println();
         }
 
-        // Oyun bittiğinde total cost'u yazdır
-        System.out.println("\nAll levels completed!");
+        System.out.println("Game completed!");
         System.out.println("Total cost for all levels: " + totalCost);
     }
-
-    /*
-     * 1) Why you prefer the search algorithm you choose? We prefer Breadth-First
-     * Search (BFS) because it explores all possible states in an organized way,
-     * going level by level. This approach ensures that you find the shortest path
-     * to the target, guaranteeing the most efficient solution with the least number
-     * of moves.
-     * 2) Can you achieve the optimal result? Why? Why not? Yes, because BFS
-     * examines all possible paths at each step and thus ensures that the goal is
-     * reached by the shortest path. In other words, it offers an optimal solution.
-     * 3) How you achieved efficiency for keeping the states? By using a hash set of
-     * unique state identifiers (combining the player's position and blocked cells),
-     * the algorithm avoids revisiting the same states, thus reducing unnecessary
-     * computations.
-     * 4) If you prefer to use DFS (tree version) then do you need to avoid cycles?
-     * When using Depth-First Search (DFS), it's crucial to watch out for cycles. If
-     * you don't check for them, DFS can end up going in circles, revisiting the
-     * same states over and over. This can lead to infinite loops and unnecessary
-     * work, making the search inefficient.
-     * 5) What will be the path-cost for this problem? Path cost is the total number
-     * of moves needed to get from the starting position to the target. Since all
-     * moves cost the same, the path cost is just the number of moves in the
-     * sequence that leads to the goal.
-     * 
-     */
-
-    public void saveMapWithElevation(String fileName) {
-        map.setElevation(elevation);
-        map.saveAsPng(fileName);
-    }
-
-    public int getFinalCost() {
-        return finalCost;
-    }
-
 }

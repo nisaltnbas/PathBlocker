@@ -1,6 +1,11 @@
+package game.model;
+
 import java.util.ArrayList;
 
-abstract class State {
+/**
+ * Abstract base class representing a game state.
+ */
+public abstract class State {
     protected int playerX;
     protected int playerY;
     protected ArrayList<ArrayList<Integer>> mapValues;

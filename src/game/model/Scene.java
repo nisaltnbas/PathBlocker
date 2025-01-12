@@ -1,9 +1,21 @@
+package game.model;
+
 import java.util.Random;
 
+/**
+ * Represents the scene with elevation data and pyramid generation.
+ */
 public class Scene {
+    private static final int MIN_SIZE = 8;
+    private static final int MAX_SIZE = 60;
+    private static final int MIN_PYRAMIDS = 1;
+    private static final int MAX_PYRAMIDS = 8;
+    private static final int BAND_SIZE = 4;
+    private static final int TOP_LEVEL = 9;
+
     public final int size;
     private final int[][] elevations;
-    private static Random rand = new Random();
+    private static final Random rand = new Random();
 
     public Scene(int size) {
         this.size = validSize(size);
@@ -13,40 +25,33 @@ public class Scene {
     public Scene(int size, int pyramidCount) {
         this.size = validSize(size);
         this.elevations = createElevationGrid(size);
-
         generatePyramids(pyramidCount);
     }
 
     public int getElevation(int x, int y) {
-        if (x >= 0 && x < size && y >= 0 && y < size)
+        if (x >= 0 && x < size && y >= 0 && y < size) {
             return elevations[y][x];
-        else
-            return -1;
+        }
+        return -1;
     }
 
-    public static int[][] createElevationGrid(int size) {
+    private static int[][] createElevationGrid(int size) {
         int[][] elevations = new int[size][];
-
         for (int i = 0; i < size; i++) {
             elevations[i] = new int[size];
         }
-
         return elevations;
     }
 
-    public static int validSize(int size) {
-        return Math.min(Math.max(size, 8), 60);
+    private static int validSize(int size) {
+        return Math.min(Math.max(size, MIN_SIZE), MAX_SIZE);
     }
 
-    public void generatePyramids(int pyramidCount) {
-        pyramidCount = Math.min(Math.max(pyramidCount, 1), 8);
+    private void generatePyramids(int pyramidCount) {
+        pyramidCount = Math.min(Math.max(pyramidCount, MIN_PYRAMIDS), MAX_PYRAMIDS);
 
-        final int band = 4;
-        final int r1 = -band;
-        final int r2 = size + band;
-
-        // Daha yumuşak geçişler için top_level'i ayarlayalım
-        int top_level = 9;
+        final int r1 = -BAND_SIZE;
+        final int r2 = size + BAND_SIZE;
 
         for (int i = 0; i < pyramidCount; i++) {
             int x_center = rand.nextInt(r2 - r1) + r1;
@@ -58,12 +63,8 @@ public class Scene {
 
                 for (int x = 0; x < row.length; x++) {
                     int delta_x = Math.abs(x_center - x);
-                    // Daha yumuşak geçişler için mesafe hesabını değiştirelim
                     double distance = Math.sqrt(delta_x * delta_x + delta_y * delta_y);
-                    // Daha yumuşak eğim için distance çarpanını azaltalım
-                    int height = Math.max((int) (top_level - (distance * 1.2)), 0);
-
-                    // Mevcut yükseklikle karşılaştır ve en yükseği al
+                    int height = Math.max((int) (TOP_LEVEL - (distance * 1.2)), 0);
                     row[x] = Math.max(row[x], height);
                 }
             }
@@ -73,22 +74,19 @@ public class Scene {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-
         for (int y = 0; y < elevations.length; y++) {
             int[] row = elevations[y];
-
             for (int x = 0; x < row.length; x++) {
-                if (row[x] == 0)
+                if (row[x] == 0) {
                     sb.append(".");
-                else if (row[x] > 9)
+                } else if (row[x] > 9) {
                     sb.append("*");
-                else
+                } else {
                     sb.append((char) ((int) '0' + row[x]));
+                }
             }
-
             sb.append("\n");
         }
-
         return sb.toString();
     }
 }

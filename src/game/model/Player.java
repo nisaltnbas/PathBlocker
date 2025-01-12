@@ -1,4 +1,9 @@
-class Player {
+package game.model;
+
+/**
+ * Represents a player in the game with position coordinates.
+ */
+public class Player {
     private int x;
     private int y;
 
@@ -7,11 +12,14 @@ class Player {
         this.y = y;
     }
 
-    // Getters
-    public int getX() { return x; }
-    public int getY() { return y; }
+    public int getX() {
+        return x;
+    }
 
-    // Setters
+    public int getY() {
+        return y;
+    }
+
     public void setPosition(int x, int y) {
         this.x = x;
         this.y = y;

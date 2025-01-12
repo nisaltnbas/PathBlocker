@@ -1,16 +1,19 @@
+package game.model;
+
+/**
+ * Represents the elevation (height) of cells in the game map.
+ */
 public class Elevation {
     private int[][] heights;
     private final int size;
     private final Scene scene;
-    private final int pyramidCount;
 
     public Elevation(int size) {
-        this(size, 3); // Default 3 piramit
+        this(size, 3); // Default 3 pyramids
     }
 
     public Elevation(int size, int pyramidCount) {
         this.size = size;
-        this.pyramidCount = pyramidCount;
         this.heights = new int[size][size];
         this.scene = new Scene(size, pyramidCount);
         generateElevations();
@@ -34,7 +37,7 @@ public class Elevation {
 
     public int getMovementCost(int x, int y) {
         int height = getHeight(x, y);
-        return height + 1; // Yükseklik + 1 maliyet
+        return height + 1; // Height + 1 cost
     }
 
     @Override
